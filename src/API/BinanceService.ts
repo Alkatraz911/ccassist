@@ -1,4 +1,6 @@
 import fetch from 'node-fetch'
+let baseAPI = 'https://data-api.binance.vision'
+
 
 interface BinanceExchangeInfoResponse {
 
@@ -22,7 +24,7 @@ export class BinanceService {
 
     static async binanceSpotActiveTicketsLoad() {
 
-        let response = await fetch('https://api.binance.com/api/v3/exchangeInfo')
+        let response = await fetch(baseAPI + '/api/v3/exchangeInfo')
         let markets = await response.json() as BinanceExchangeInfoResponse
 
         if (Array.isArray(markets.symbols)) {
@@ -35,7 +37,7 @@ export class BinanceService {
     }
 
     static async binanceKlinesLoad(ticket:string, interval:string, limit:number) {
-        let response = await fetch(`https://api.binance.com/api/v3/klines?symbol=${ticket}&interval=${interval}&limit=${limit}`)
+        let response = await fetch(baseAPI + `/api/v3/klines?symbol=${ticket}&interval=${interval}&limit=${limit}`)
         return await response.json() as Array<[]>
 
     }

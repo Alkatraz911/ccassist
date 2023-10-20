@@ -21,10 +21,7 @@ const AppDataSource = new DataSource({
 });
 
 
-type RSIdata = {
-    period: number;
-    values: Array<number>;
-}
+
 
 type TicketWithRSI = {
     ticker: string;
@@ -33,43 +30,27 @@ type TicketWithRSI = {
 }
 
 
-const calculateRSI = ({ period, values }: RSIdata) : number | null => {
-    if(values && period) {
-        let gainDays = 0;
-        let lossDays = 0;
-        let loss = 0;
-        let gain = 0;
-        let RSI = 0;
-        if (values.length < period) {
-            return null
-        } else {
-            if (values.length > 0) {
 
-                
-                for (const el of values) {
-                    let nextEl = values[values.indexOf(el) + 1]
-                    if (nextEl) {
-                        if (el < nextEl) {
-                            gain += nextEl
-                            gainDays += 1
-                        } else {
-                            loss += nextEl
-                            lossDays += 1
-                        }
-                    } else {
-                        let gainDaysEMA = gain / gainDays
-                        let lossDaysEMA = loss / lossDays
-                        let RS = gainDaysEMA / lossDaysEMA
-                        RSI = 100 - 100 / (1 + RS)
-                    }
-                }
-                return RSI
-            }
-        }
-        return RSI
-    } else {
-        return null
+
+function calculatRSI(closingPrices:any) {
+    // Calculate the average of the upward price changes
+    let avgUpwardChange = 0;
+    for (let i = 1; i < closingPrices.length; i++) {
+      avgUpwardChange += Math.max(0, closingPrices[i] - closingPrices[i - 1]);
     }
+    avgUpwardChange /= closingPrices.length;
+  
+    // Calculate the average of the downward price changes
+    let avgDownwardChange = 0;
+    for (let i = 1; i < closingPrices.length; i++) {
+      avgDownwardChange += Math.max(0, closingPrices[i - 1] - closingPrices[i]);
+    }
+    avgDownwardChange /= closingPrices.length;
+  
+    // Calculate the RSI
+    const rsi = 100 - (100 / (1 + (avgUpwardChange / avgDownwardChange)));
+  
+    return rsi;
 }
 
 
@@ -80,31 +61,21 @@ AppDataSource.initialize()
 
         const deepCorrectionAtUptrendFinder = async () => {
             let result: TicketWithRSI[] = []
-            let rsi = Technicalindicators.RSI
             let coins = await AppDataSource.manager.find(SpotTradingTickets)
-            let halfdayrsi = new RSI(14)
-            let hourrsi = new RSI(14)
+            let rsi = Technicalindicators.RSI
             if (coins) {
                 for (const el of coins) {
                     
                     let hoursArray = await binanceKlinesLoader(el.symbol, "1h", 15)
+                    // let hourRsi = Math.round((calculatRSI(hoursArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100 
+                    let [hourRsi] = rsi.calculate({period: 14, values: hoursArray.map(el => Number(el.closePrice))})
                     
-                    for (const element of hoursArray) {
-                        hourrsi.update(Number(element.closePrice))
-                    }
-                    let hourRsi = Number(hourrsi.getResult().toFixed(2))
-                
-                    // let myHourRSI = calculateRSI({ period: 14, values: <Array<number>>hoursArray.map(el => Number(el.closePrice)) })
-
                     let halfdayArray = await binanceKlinesLoader(el.symbol, "12h", 15)
-                    
-                    for (const element of halfdayArray) {
-                        halfdayrsi.update(Number(element.closePrice))
-                    }
-                    let halfdayRsi = Number(halfdayrsi.getResult().toFixed(2))
-                    if (hourRsi && halfdayRsi)
-                    console.log({ ticker: el.symbol, hourRsi, halfdayRsi })
+                    let halfdayRsi = Math.round((calculatRSI(halfdayArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100 
+                    if (hourRsi && halfdayRsi){
+                        console.log({ ticker: el.symbol, hourRsi, halfdayRsi })
                         result.push({ ticker: el.symbol, hourRsi, halfdayRsi })
+                    }
                 }
                 return result
             }
@@ -113,23 +84,24 @@ AppDataSource.initialize()
         const token = '6017219652:AAHttibf83BofBNNBgplV6Xs2QUUKX7x0Ik'
         const bot = new Telegraf(token);
 
-
-        setInterval(() => {
+        const start = () =>  {
             deepCorrectionAtUptrendFinder().then(data => {
                 if (data) {
-                    let message = ''
+                    let message = '📉Deep correction detected\n'
                     for (const el of data) {
                         if (el.hourRsi < 30 && el.halfdayRsi > 49) {
                             message += `Ticker: ${el.ticker} RSI1H: ${el.hourRsi} RSI12H: ${el.halfdayRsi}\n`
                         }
                     }
                     if(message) 
-
+                    // console.log(message)
                     bot.telegram.sendMessage(405531728, message)
                 }
             })
-        }, 60000)
+        }
 
+        start()
+        setTimeout(start,600000)
 
     })
 
