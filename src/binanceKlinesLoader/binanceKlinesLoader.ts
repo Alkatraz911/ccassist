@@ -8,13 +8,14 @@ interface BinanceKlinesLoaderReturn {
     closePrice: string;
     volume: string;
     klineClose: string;
-    quoteAssetVolume: number;
+    quoteAssetVolume: string;
     numberOfTrades: number;
     takerBuyBaseAsserVolume: string;
     takerBuyQuoteAssetVolume: string;
 
 }
 
+export type {BinanceKlinesLoaderReturn}
 
 export const binanceKlinesLoader = async (ticket:string, interval:string, limit:number):Promise<Array<BinanceKlinesLoaderReturn>> => {
     let data = await BinanceService.binanceKlinesLoad(ticket, interval,limit)

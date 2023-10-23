@@ -1,5 +1,5 @@
 import fetch from 'node-fetch'
-let baseAPI = 'https://data-api.binance.vision'
+let baseAPI = 'https://api.binance.com'
 
 
 interface BinanceExchangeInfoResponse {
