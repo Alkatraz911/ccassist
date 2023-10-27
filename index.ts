@@ -5,8 +5,9 @@ import { SpotTradingTickets } from "./src/models/SpotTradingTickets.js";
 import * as Technicalindicators from 'technicalindicators'
 import { BinanceKlinesLoaderReturn } from "./src/binanceKlinesLoader/binanceKlinesLoader.js";
 import { binanceKlinesLoader } from "./src/binanceKlinesLoader/binanceKlinesLoader.js";
-import { Telegraf } from "telegraf";
 import { Big, RSI } from 'trading-signals'
+import {bot} from './src/bot/bot.js'
+
 
 
 const AppDataSource = new DataSource({
@@ -24,12 +25,7 @@ const AppDataSource = new DataSource({
 
 
 
-type TicketWithRSI = {
-    ticker: string;
-    hourRsi: number;
-    halfdayRsi: number;
-    volumes: string[][];
-}
+
 
 
 
@@ -61,79 +57,94 @@ AppDataSource.initialize()
     .then(async () => {
         let coins = await AppDataSource.manager.find(SpotTradingTickets)
 
-        const deepCorrectionAtUptrendFinder = async () => {
+        const RSIcounter = async (coins: SpotTradingTickets[], firstTimefrfame: string, secondTimeframe:string, rsiLength:number) => {
+            type TicketWithRSI = {
+                ticker: string;
+                hourRsi: number;
+                halfdayRsi: number;
+            }
+
             let result: TicketWithRSI[] = []
 
             let rsi = Technicalindicators.RSI
             if (coins) {
                 for (const el of coins) {
 
-                    let hoursArray = await binanceKlinesLoader(el.symbol, "1h", 15)
+                    let hoursArray = await binanceKlinesLoader(el.symbol, firstTimefrfame, rsiLength+1)
                     // let hourRsi = Math.round((calculatRSI(hoursArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100 
-                    let [hourRsi] = rsi.calculate({ period: 14, values: hoursArray.map(el => Number(el.closePrice)) })
-                    let volumes = hoursArray.map((el: BinanceKlinesLoaderReturn, i) => {
-                        
-                        let result: string[] = [];
-                        let baseCandeleVolume = 0;
-                        if (el.quoteAssetVolume) {
-                            if (i === 0) {
-                                let [volume] = el.quoteAssetVolume.split('.', 1)
-                                if (volume) {
-                                    result = [volume, 'base candle']
-                                    baseCandeleVolume = Number(volume)
-                                }
-                            } else {
-                                console.log(i)
-                                let [volume] = el.quoteAssetVolume.split('.', 1)
-                                let percent = Number(volume)/baseCandeleVolume * 100
-                                if (volume) {
-                                    result = [volume, `${percent}%`]
-                                    baseCandeleVolume = Number(volume)
-                                }
-                            }
-                        } else {
-                            result = ['0', '0']
-                        }
+                    let [hourRsi] = rsi.calculate({ period: rsiLength, values: hoursArray.map(el => Number(el.closePrice)) })
 
-                        return result
-                    })
-                    let halfdayArray = await binanceKlinesLoader(el.symbol, "12h", 15)
+                    let halfdayArray = await binanceKlinesLoader(el.symbol, secondTimeframe, rsiLength+1)
                     let halfdayRsi = Math.round((calculatRSI(halfdayArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100
-                    if (hourRsi && halfdayRsi && volumes) {
-                        console.log({ ticker: el.symbol, hourRsi, halfdayRsi, volumes })
-                        result.push({ ticker: el.symbol, hourRsi, halfdayRsi, volumes })
+                    if (hourRsi && halfdayRsi) {
+                        console.log({ ticker: el.symbol, hourRsi, halfdayRsi })
+                        result.push({ ticker: el.symbol, hourRsi, halfdayRsi })
                     }
                 }
                 return result
             }
         }
 
-        const token = '6017219652:AAHttibf83BofBNNBgplV6Xs2QUUKX7x0Ik'
-        const bot = new Telegraf(token);
+        
 
-        // bot.command('start', async (ctx) => {
-        //     await ctx.reply(
-        //       `Please enter coin ticker you want to track. Example: If you want to track Bitcoin enter BTC`
-        //     );
-        //   })
+        // bot.launch();
 
 
-        setTimeout(() => {
-            deepCorrectionAtUptrendFinder().then(data => {
+        const deepCorrectionAtUptrendFinder = (coins: SpotTradingTickets[], firstTimefrfame: string, secondTimeframe:string, rsiLength:number, rsiValueshouldbelower:number, rsiValueshouldbehigher:number ) => {
+            RSIcounter(coins,firstTimefrfame, secondTimeframe,rsiLength).then(data => {
                 if (data) {
                     let message = '📉Deep correction detected\n'
                     for (const el of data) {
-                        if (el.hourRsi < 30 && el.halfdayRsi > 49) {
+                        if (el.hourRsi < rsiValueshouldbelower && rsiValueshouldbehigher > 49) {
                             message += `Ticker: ${el.ticker} RSI1H: ${el.hourRsi} RSI12H: ${el.halfdayRsi}\n`
                         }
+
                     }
-                    if (message)
-                        // console.log(message)
-                        bot.telegram.sendMessage(405531728, message)
+                    // bot.telegram.sendMessage(405531728, message)
                 }
             })
-        }, 30000)
+        }
 
+
+        const trackVolumes = async (ticket:string, timeframe:string, candlesNumber:number) => {
+            let candles = await binanceKlinesLoader(ticket, timeframe, candlesNumber)
+            let baseCandleVolume = 0;
+            let averageVolume
+            let volumes = candles.map((el: BinanceKlinesLoaderReturn, i) => {
+
+                let result: string[] = [];
+                if (el.quoteAssetVolume) {
+                    if (i === 0) {
+                        let [volume] = el.quoteAssetVolume.split('.', 1)
+                        if (volume) {
+                            result = [volume, 'base candle',  new Date(el.klineClose).toLocaleTimeString()]
+                            baseCandleVolume = Number(volume)
+                        }
+                    } else {
+                        let [volume] = el.quoteAssetVolume.split('.', 1)
+                        let percent = Number(volume) / baseCandleVolume * 100
+                        if (volume) {
+                            result = [volume, `${Math.ceil(percent)}%`, new Date(el.klineClose).toLocaleTimeString()]
+                            baseCandleVolume = Number(volume)
+                        }
+                    }
+                } else {
+                    result = ['0', '0']
+                }
+
+                return result
+            })
+            return {ticket, timeframe, volumes}
+        }
+
+        // deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)
+        // setInterval(()=>{deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)}, 300000)
+
+       
+        trackVolumes('STGUSDT', '5m', 100).then(data=>console.log(data))
+       
+      
+        
     })
 
 
