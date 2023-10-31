@@ -10,7 +10,7 @@ import { bot } from "./src/bot/bot.js";
 const AppDataSource = new DataSource({
   type: "postgres",
   host: "localhost",
-  port: 5432,
+  port: 4001,
   username: "postgres",
   password: "admin",
   database: "ccassist",
@@ -91,7 +91,7 @@ AppDataSource.initialize().then(async () => {
     }
   };
 
-  // bot.launch();
+  bot.launch();
 
   const deepCorrectionAtUptrendFinder = (
     coins: SpotTradingTickets[],
@@ -126,6 +126,7 @@ AppDataSource.initialize().then(async () => {
   ) => {
     let candles = await binanceKlinesLoader(ticket, timeframe, candlesNumber);
     let baseCandleVolume = 0;
+    let baseCandlePrice = 0
     let averageVolume = 0;
     let volumes = candles.map((el: BinanceKlinesLoaderReturn, i) => {
       let result: object = [];
@@ -136,7 +137,6 @@ AppDataSource.initialize().then(async () => {
             result = {
               volume,
               percentOfPreviousCandle: "base candle",
-              percentOfAverageVolume: "base candle",
               dateTime:
                 new Date(el.klineClose).toLocaleDateString() +
                 " " +
@@ -144,16 +144,31 @@ AppDataSource.initialize().then(async () => {
             };
             baseCandleVolume = Number(volume);
             averageVolume = Number(volume);
+            baseCandlePrice = Number(el.closePrice)
           }
         } else {
           let [volume] = el.quoteAssetVolume.split(".", 1);
           let percent = (Number(volume) / baseCandleVolume) * 100;
           let percentOfAverageVolume = (Number(volume) / averageVolume) * 100;
+          let priceChange = (Number(el.closePrice) - baseCandlePrice)
+          let priceChangePercent = priceChange/baseCandlePrice * 100
+          priceChangePercent >= 2 
+          ? 
+          bot.telegram.sendMessage(405531728, 
+        `PUMP
+            ticket: ${ticket},
+            volume: ${volume}, 
+            volume%: ${percent.toFixed()}, 
+            price change: ${priceChange.toFixed(2)}, 
+            prciceChange%: ${priceChangePercent.toFixed()} ` )
+          :
+          null
           if (volume) {
             result = {
               volume,
-              percentOfPreviousCandle: `${Math.ceil(percent)}%`,
-              percentOfAverageVolume: `${Math.ceil(percentOfAverageVolume)}%`,
+              percentOfPreviousCandle: `${percent.toFixed()}%`,
+              priceChange: `${priceChange.toFixed(2)}`,
+              priceChangePercent: `${priceChangePercent.toFixed()}%`, 
               dateTime:
                 new Date(el.klineClose).toLocaleDateString() +
                 " " +
@@ -161,6 +176,7 @@ AppDataSource.initialize().then(async () => {
             };
             baseCandleVolume = Number(volume);
             averageVolume = (averageVolume + Number(volume))/(i+1);
+            baseCandlePrice = Number(el.closePrice)
           }
         }
       }  else {
@@ -182,5 +198,11 @@ AppDataSource.initialize().then(async () => {
   // deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)
   // setInterval(()=>{deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)}, 300000)
 
-  trackVolumes("BURGERUSDT", "15m", 10).then((data) => console.log(data));
+
+  setInterval(() => {
+    for (const el of coins) {
+        trackVolumes(el.symbol, "1h", 3)
+    }
+  }, 900000)
+  
 });
