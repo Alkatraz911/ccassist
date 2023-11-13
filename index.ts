@@ -1,3 +1,4 @@
+import { CoinAlertVolumes } from './src/models/CoinAlertVolumes.js';
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { SpotTradingTickets } from "./src/models/SpotTradingTickets.js";
@@ -6,27 +7,28 @@ import { trackVolumes } from "./src/binanceVolumeTracker/binanceVolumeTracker.js
 import { binanceKlinesLoader } from "./src/binanceKlinesLoader/binanceKlinesLoader.js";
 import { Big, RSI } from "trading-signals";
 import { bot } from "./src/bot/bot.js";
+import { binanceSpotActiveTicketsLoader } from './src/binanceSpotActiveTicketsLoader/binanceSpotActiveTicketsLoader.js'
 
 
 const PRICE_CHANGE_PERCENT = 2
 const VOLUME_CHANGE_PERCENT = 200
 
 type volumesMapReturn = {
-    volume:string;
-    percentOfPreviousCandle:string;
+    volume: string;
+    percentOfPreviousCandle: string;
     priceChange: string;
     priceChangePercent: string;
     dateTime: string
 }
 
-const AppDataSource = new DataSource({
+export const AppDataSource = new DataSource({
     type: "postgres",
     host: "localhost",
     port: 4001,
     username: "postgres",
     password: "admin",
     database: "ccassist",
-    entities: [SpotTradingTickets],
+    entities: [SpotTradingTickets, CoinAlertVolumes],
     synchronize: true,
     logging: false,
 });
@@ -54,6 +56,9 @@ function calculatRSI(closingPrices: any) {
 
 AppDataSource.initialize().then(async () => {
     let coins = await AppDataSource.manager.find(SpotTradingTickets);
+    if (!coins) {
+        await binanceSpotActiveTicketsLoader()
+    }
 
     const RSIcounter = async (
         coins: SpotTradingTickets[],
@@ -136,16 +141,16 @@ AppDataSource.initialize().then(async () => {
     // deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)
     // setInterval(()=>{deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)}, 300000)
 
-    const start =  async (coins: SpotTradingTickets[]) => {
+    const start = async (coins: SpotTradingTickets[]) => {
         let message = '';
         for (const el of coins) {
             let result = await trackVolumes(el.symbol, "5m", 3)
-            let {volumes, ticket, timeframe} = result
+            let { volumes, ticket, timeframe } = result
             for (const el of volumes) {
-                let {volume, percentOfPreviousCandle,  priceChange, priceChangePercent, dateTime} = el;
-                if (Number(priceChangePercent.slice(0,priceChangePercent.length-1)) >= PRICE_CHANGE_PERCENT 
-                && 
-                Number(percentOfPreviousCandle.slice(0,percentOfPreviousCandle.length-1)) >= VOLUME_CHANGE_PERCENT) {
+                let { volume, percentOfPreviousCandle, priceChange, priceChangePercent, dateTime } = el;
+                if (Number(priceChangePercent.slice(0, priceChangePercent.length - 1)) >= PRICE_CHANGE_PERCENT
+                    &&
+                    Number(percentOfPreviousCandle.slice(0, percentOfPreviousCandle.length - 1)) >= VOLUME_CHANGE_PERCENT) {
                     message += `PUMP
                     ticket: ${ticket},
                     volume: ${volume}, 
@@ -160,16 +165,22 @@ AppDataSource.initialize().then(async () => {
 
 
         }
-        if(message) {
-            bot.telegram.sendMessage(405531728,message)
+        if (message) {
+            bot.telegram.sendMessage(405531728, message)
         } else {
             console.log('Nothing found')
-        } 
+        }
     }
 
-    setInterval(() => {
-    start(coins)
-    }, 300000)
+    const bootstrap = () => {
+
+        start(coins);
+        setInterval(() => {
+            start(coins)
+        }, 300000)
+    }
+
+    bootstrap()
 
 
 

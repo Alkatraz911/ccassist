@@ -1,4 +1,4 @@
-import { binanceKlinesLoader, BinanceKlinesLoaderReturn } from "../binanceKlinesLoader/binanceKlinesLoader";
+import { binanceKlinesLoader, BinanceKlinesLoaderReturn } from "../binanceKlinesLoader/binanceKlinesLoader.js";
 
 export const trackVolumes = async (
     ticket: string,
@@ -9,7 +9,7 @@ export const trackVolumes = async (
     let baseCandleVolume = 0;
     let baseCandlePrice = 0
     let averageVolume = 0;
-    let volumes = candles.map((el: BinanceKlinesLoaderReturn, i) => {
+    let volumes = candles.map((el: BinanceKlinesLoaderReturn, i:number) => {
         let volume:string = '';
         let percentOfPreviousCandle:string = '';
         let priceChange: string = '';

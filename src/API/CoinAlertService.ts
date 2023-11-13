@@ -2,7 +2,7 @@ import fetch from 'node-fetch'
 let baseAPI = 'https://coinalert.me/public'
 
 
-interface MarketsResponse {
+interface MarketResponse {
 
     market: string;
     market_name: string;
@@ -17,12 +17,17 @@ interface MarketsResponse {
     vol_change_24: number
 }
 
+interface MarketsResponse {
+    state: boolean;
+    message: string;
+    data: MarketResponse[]
+}
 
 
 
 
 
-export class BinanceService {
+export class CoinAlertService {
 
     static async coinAlertMarketssLoad() {
 
@@ -31,7 +36,7 @@ export class BinanceService {
 
         if (response.ok) {
             let markets = await response.json() as MarketsResponse
-            return markets
+            return markets.data
         } else {
             return response.status + ' ' + response.statusText
         }
