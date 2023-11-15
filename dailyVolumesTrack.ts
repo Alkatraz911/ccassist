@@ -38,6 +38,7 @@ export const trackCoinAlertVolumes = async () => {
 
 const start = () => {
      trackCoinAlertVolumes()
-     setInterval(()=>{}, 86400000)
+    //  setInterval(()=>{}, 86400000)
 }
 
+start()

@@ -180,8 +180,6 @@ AppDataSource.initialize().then(async () => {
         }, 300000)
     }
 
-    bootstrap()
-
-
+    // bootstrap()
 
 });
