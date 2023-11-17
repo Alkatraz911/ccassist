@@ -16,5 +16,7 @@ export class CoinAlertVolumes {
   last:  string;
   @Column()
   date:  string;
+  @Column()
+  time:  string;
   
 }
