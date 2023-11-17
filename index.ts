@@ -25,7 +25,7 @@ type volumesMapReturn = {
 export const AppDataSource = new DataSource({
     type: "postgres",
     host: "localhost",
-    port: 4001,
+    port: 5432,
     username: "postgres",
     password: "admin",
     database: "ccassist",
@@ -57,8 +57,11 @@ function calculatRSI(closingPrices: any) {
 
 AppDataSource.initialize().then(async () => {
     let coins = await AppDataSource.manager.find(SpotTradingTickets);
-    if (!coins) {
-        await binanceSpotActiveTicketsLoader()
+    
+
+    if (coins.length === 0) {
+        binanceSpotActiveTicketsLoader(AppDataSource)
+        coins = await AppDataSource.manager.find(SpotTradingTickets);
     }
 
     const RSIcounter = async (
