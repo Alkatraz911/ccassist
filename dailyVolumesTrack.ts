@@ -17,27 +17,43 @@ type CoinAlertMarketElement = {
     vol_change_24: number
 }
 
+
+
+
+const writeToDB = async (el:CoinAlertMarketElement) => { 
+    let check = await AppDataSource.manager
+    .exists(CoinAlertVolumes, {where: {market: el.market, pair: el.pair, date: new Date().toLocaleDateString()}})
+    
+    if(!check) {
+        AppDataSource.manager.insert(CoinAlertVolumes, {
+            market: el.market,
+            pair: el.pair,
+            vol: el.vol,
+            vol_change_24: el.vol_change_24,
+            last: el.last,
+            date: new Date().toLocaleDateString(),
+            time: new Date().toLocaleTimeString()
+        })  
+    } else {
+        console.log("Found duplicate, not written to db")
+        return
+    }
+}
+
 export const trackCoinAlertVolumes = async () => {
     
     let markets = await CoinAlertService.coinAlertMarketssLoad()
    
     if(Array.isArray(markets)) {
-        markets.forEach((el) => { 
-            AppDataSource.manager.insert(CoinAlertVolumes, {
-                market: el.market,
-                pair: el.pair,
-                vol: el.vol,
-                vol_change_24: el.vol_change_24,
-                last: el.last,
-                date: new Date(new Date().getTime() - 86400000).toLocaleDateString()
-            })
-        })
+        for (const el of markets) {
+            writeToDB(el)
+        }
+        console.log("Writing to DB finished")
     }
     
 }
 
-const start = () => {
-     trackCoinAlertVolumes()
-     setInterval(()=>{}, 86400000)
-}
+
+
+
 

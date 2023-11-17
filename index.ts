@@ -8,6 +8,7 @@ import { binanceKlinesLoader } from "./src/binanceKlinesLoader/binanceKlinesLoad
 import { Big, RSI } from "trading-signals";
 import { bot } from "./src/bot/bot.js";
 import { binanceSpotActiveTicketsLoader } from './src/binanceSpotActiveTicketsLoader/binanceSpotActiveTicketsLoader.js'
+import { trackCoinAlertVolumes } from './dailyVolumesTrack.js'
 
 
 const PRICE_CHANGE_PERCENT = 2
@@ -111,7 +112,7 @@ AppDataSource.initialize().then(async () => {
         }
     };
 
-    bot.launch();
+    // bot.launch();
 
     const deepCorrectionAtUptrendFinder = (
         coins: SpotTradingTickets[],
@@ -183,8 +184,15 @@ AppDataSource.initialize().then(async () => {
         }, 300000)
     }
 
-    bootstrap()
-
-
+    // bootstrap()
+    // trackCoinAlertVolumes()
+    setInterval(()=>{
+        let timeOfWriting = '15:00:00'
+        let timeNow = new Date().toLocaleTimeString()
+        console.log(timeNow)
+        if(timeNow === timeOfWriting) {
+            trackCoinAlertVolumes()
+        }
+    },1000)
 
 });
