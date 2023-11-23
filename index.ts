@@ -170,9 +170,27 @@ AppDataSource.initialize().then(async () => {
 
         }
         if (message) {
-            bot.telegram.sendMessage(405531728, message)
+            try{
+                bot.telegram.sendMessage(405531728, message)
+            } catch(e) {
+                if(e.description === 'Bad Request: message is too long') {
+                    let messagesArray = message.split(`
+                    
+                    `)
+                    let firstHalfMessagesArray = messagesArray.splice(0,messagesArray.length/2)
+                    let firstMessage = firstHalfMessagesArray.join(`
+                    
+                    `)
+                    let secondMessage = messagesArray.join(`
+                    
+                    `)
+                    bot.telegram.sendMessage(405531728, firstMessage)
+                    bot.telegram.sendMessage(405531728, secondMessage)
+                }
+            }
+            
         } else {
-            console.log('Nothing found')
+            bot.telegram.sendMessage(405531728, 'Not found')
         }
     }
 
