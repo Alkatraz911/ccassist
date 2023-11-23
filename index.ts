@@ -9,6 +9,7 @@ import { Big, RSI } from "trading-signals";
 import { bot } from "./src/bot/bot.js";
 import { binanceSpotActiveTicketsLoader } from './src/binanceSpotActiveTicketsLoader/binanceSpotActiveTicketsLoader.js'
 import { trackCoinAlertVolumes } from './dailyVolumesTrack.js'
+import { TelegramError } from 'telegraf';
 
 
 const PRICE_CHANGE_PERCENT = 2
@@ -173,20 +174,23 @@ AppDataSource.initialize().then(async () => {
             try{
                 bot.telegram.sendMessage(405531728, message)
             } catch(e) {
-                if(e.description === 'Bad Request: message is too long') {
-                    let messagesArray = message.split(`
-                    
-                    `)
-                    let firstHalfMessagesArray = messagesArray.splice(0,messagesArray.length/2)
-                    let firstMessage = firstHalfMessagesArray.join(`
-                    
-                    `)
-                    let secondMessage = messagesArray.join(`
-                    
-                    `)
-                    bot.telegram.sendMessage(405531728, firstMessage)
-                    bot.telegram.sendMessage(405531728, secondMessage)
+                if(e instanceof TelegramError) {
+                    if(e.response.description === 'Bad Request: message is too long') {
+                        let messagesArray = message.split(`
+                        
+                        `)
+                        let firstHalfMessagesArray = messagesArray.splice(0,messagesArray.length/2)
+                        let firstMessage = firstHalfMessagesArray.join(`
+                        
+                        `)
+                        let secondMessage = messagesArray.join(`
+                        
+                        `)
+                        bot.telegram.sendMessage(405531728, firstMessage)
+                        bot.telegram.sendMessage(405531728, secondMessage)
+                    }
                 }
+
             }
             
         } else {
