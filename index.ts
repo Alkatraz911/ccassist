@@ -211,7 +211,7 @@ AppDataSource.initialize().then(async () => {
     setInterval(()=>{
         let timeOfWriting = '15:00:00'
         let timeNow = new Date().toLocaleTimeString()
-        console.log(timeNow)
+
         if(timeNow === timeOfWriting) {
             trackCoinAlertVolumes()
         }
