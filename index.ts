@@ -56,165 +56,177 @@ function calculatRSI(closingPrices: any) {
     return rsi;
 }
 
-AppDataSource.initialize().then(async () => {
-    let coins = await AppDataSource.manager.find(SpotTradingTickets);
+const boot = () => {
+    AppDataSource.initialize().then(async () => {
+        let coins = await AppDataSource.manager.find(SpotTradingTickets);
+        
     
-
-    if (coins.length === 0) {
-        binanceSpotActiveTicketsLoader(AppDataSource)
-        coins = await AppDataSource.manager.find(SpotTradingTickets);
-    }
-
-    const RSIcounter = async (
-        coins: SpotTradingTickets[],
-        firstTimefrfame: string,
-        secondTimeframe: string,
-        rsiLength: number
-    ) => {
-        type TicketWithRSI = {
-            ticker: string;
-            hourRsi: number;
-            halfdayRsi: number;
-        };
-
-        let result: TicketWithRSI[] = [];
-
-        let rsi = Technicalindicators.RSI;
-        if (coins) {
-            for (const el of coins) {
-                let hoursArray = await binanceKlinesLoader(
-                    el.symbol,
-                    firstTimefrfame,
-                    rsiLength + 1
-                );
-                // let hourRsi = Math.round((calculatRSI(hoursArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100
-                let [hourRsi] = rsi.calculate({
-                    period: rsiLength,
-                    values: hoursArray.map((el) => Number(el.closePrice)),
-                });
-
-                let halfdayArray = await binanceKlinesLoader(
-                    el.symbol,
-                    secondTimeframe,
-                    rsiLength + 1
-                );
-                let halfdayRsi =
-                    Math.round(
-                        (calculatRSI(halfdayArray.map((el) => Number(el.closePrice))) +
-                            Number.EPSILON) *
-                        100
-                    ) / 100;
-                if (hourRsi && halfdayRsi) {
-                    console.log({ ticker: el.symbol, hourRsi, halfdayRsi });
-                    result.push({ ticker: el.symbol, hourRsi, halfdayRsi });
-                }
-            }
-            return result;
+        if (coins.length === 0) {
+            binanceSpotActiveTicketsLoader(AppDataSource)
+            coins = await AppDataSource.manager.find(SpotTradingTickets);
         }
-    };
-
-    // bot.launch();
-
-    const deepCorrectionAtUptrendFinder = (
-        coins: SpotTradingTickets[],
-        firstTimefrfame: string,
-        secondTimeframe: string,
-        rsiLength: number,
-        rsiValueshouldbelower: number,
-        rsiValueshouldbehigher: number
-    ) => {
-        RSIcounter(coins, firstTimefrfame, secondTimeframe, rsiLength).then(
-            (data) => {
-                if (data) {
-                    let message = "📉Deep correction detected\n";
-                    for (const el of data) {
-                        if (
-                            el.hourRsi < rsiValueshouldbelower &&
-                            rsiValueshouldbehigher > 49
-                        ) {
-                            message += `Ticker: ${el.ticker} RSI1H: ${el.hourRsi} RSI12H: ${el.halfdayRsi}\n`;
+    
+        const RSIcounter = async (
+            coins: SpotTradingTickets[],
+            firstTimefrfame: string,
+            secondTimeframe: string,
+            rsiLength: number
+        ) => {
+            type TicketWithRSI = {
+                ticker: string;
+                hourRsi: number;
+                halfdayRsi: number;
+            };
+    
+            let result: TicketWithRSI[] = [];
+    
+            let rsi = Technicalindicators.RSI;
+            if (coins) {
+                for (const el of coins) {
+                    let hoursArray = await binanceKlinesLoader(
+                        el.symbol,
+                        firstTimefrfame,
+                        rsiLength + 1
+                    );
+                    // let hourRsi = Math.round((calculatRSI(hoursArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100
+                    let [hourRsi] = rsi.calculate({
+                        period: rsiLength,
+                        values: hoursArray.map((el) => Number(el.closePrice)),
+                    });
+    
+                    let halfdayArray = await binanceKlinesLoader(
+                        el.symbol,
+                        secondTimeframe,
+                        rsiLength + 1
+                    );
+                    let halfdayRsi =
+                        Math.round(
+                            (calculatRSI(halfdayArray.map((el) => Number(el.closePrice))) +
+                                Number.EPSILON) *
+                            100
+                        ) / 100;
+                    if (hourRsi && halfdayRsi) {
+                        console.log({ ticker: el.symbol, hourRsi, halfdayRsi });
+                        result.push({ ticker: el.symbol, hourRsi, halfdayRsi });
+                    }
+                }
+                return result;
+            }
+        };
+    
+        // bot.launch();
+    
+        const deepCorrectionAtUptrendFinder = (
+            coins: SpotTradingTickets[],
+            firstTimefrfame: string,
+            secondTimeframe: string,
+            rsiLength: number,
+            rsiValueshouldbelower: number,
+            rsiValueshouldbehigher: number
+        ) => {
+            RSIcounter(coins, firstTimefrfame, secondTimeframe, rsiLength).then(
+                (data) => {
+                    if (data) {
+                        let message = "📉Deep correction detected\n";
+                        for (const el of data) {
+                            if (
+                                el.hourRsi < rsiValueshouldbelower &&
+                                rsiValueshouldbehigher > 49
+                            ) {
+                                message += `Ticker: ${el.ticker} RSI1H: ${el.hourRsi} RSI12H: ${el.halfdayRsi}\n`;
+                            }
+                        }
+                        // bot.telegram.sendMessage(405531728, message)
+                    }
+                }
+            );
+        };
+    
+    
+    
+        // deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)
+        // setInterval(()=>{deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)}, 300000)
+    
+        const start = async (coins: SpotTradingTickets[]) => {
+            let message = '';
+            for (const el of coins) {
+                let result = await trackVolumes(el.symbol, "5m", 3)
+                let { volumes, ticket, timeframe } = result
+                for (const el of volumes) {
+                    let { volume, percentOfPreviousCandle, priceChange, priceChangePercent, dateTime } = el;
+                    if (Number(priceChangePercent.slice(0, priceChangePercent.length - 1)) >= PRICE_CHANGE_PERCENT
+                        &&
+                        Number(percentOfPreviousCandle.slice(0, percentOfPreviousCandle.length - 1)) >= VOLUME_CHANGE_PERCENT) {
+                        message += `PUMP
+                        ticket: ${ticket},
+                        volume: ${volume}, 
+                        volume%: ${percentOfPreviousCandle}, 
+                        price change: ${priceChange}, 
+                        prciceChange%: ${priceChangePercent},
+                        dateTime: ${dateTime}
+    
+                        `
+                    }
+                }
+    
+    
+            }
+            if (message) {
+                try{
+                    bot.telegram.sendMessage(405531728, message)
+                } catch(e) {
+                    if(e instanceof TelegramError) {
+                        if(e.response.description === 'Bad Request: message is too long') {
+                            let messagesArray = message.split(`
+                            
+                            `)
+                            let firstHalfMessagesArray = messagesArray.splice(0,messagesArray.length/2)
+                            let firstMessage = firstHalfMessagesArray.join(`
+                            
+                            `)
+                            let secondMessage = messagesArray.join(`
+                            
+                            `)
+                            bot.telegram.sendMessage(405531728, firstMessage)
+                            bot.telegram.sendMessage(405531728, secondMessage)
                         }
                     }
-                    // bot.telegram.sendMessage(405531728, message)
+    
                 }
+                
+            } else {
+                bot.telegram.sendMessage(405531728, 'Not found')
             }
-        );
-    };
-
-
-
-    // deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)
-    // setInterval(()=>{deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)}, 300000)
-
-    const start = async (coins: SpotTradingTickets[]) => {
-        let message = '';
-        for (const el of coins) {
-            let result = await trackVolumes(el.symbol, "5m", 3)
-            let { volumes, ticket, timeframe } = result
-            for (const el of volumes) {
-                let { volume, percentOfPreviousCandle, priceChange, priceChangePercent, dateTime } = el;
-                if (Number(priceChangePercent.slice(0, priceChangePercent.length - 1)) >= PRICE_CHANGE_PERCENT
-                    &&
-                    Number(percentOfPreviousCandle.slice(0, percentOfPreviousCandle.length - 1)) >= VOLUME_CHANGE_PERCENT) {
-                    message += `PUMP
-                    ticket: ${ticket},
-                    volume: ${volume}, 
-                    volume%: ${percentOfPreviousCandle}, 
-                    price change: ${priceChange}, 
-                    prciceChange%: ${priceChangePercent},
-                    dateTime: ${dateTime}
-
-                    `
-                }
+        }
+    
+        const bootstrap = () => {
+    
+            start(coins);
+            setInterval(() => {
+                start(coins)
+            }, 300000)
+        }
+    
+        bootstrap()
+        // trackCoinAlertVolumes()
+        setInterval(()=>{
+            let timeOfWriting = '15:00:00'
+            let timeNow = new Date().toLocaleTimeString()
+    
+            if(timeNow === timeOfWriting) {
+                trackCoinAlertVolumes()
             }
+        },1000)
+    
+    });
+}
 
+boot()
 
-        }
-        if (message) {
-            try{
-                bot.telegram.sendMessage(405531728, message)
-            } catch(e) {
-                if(e instanceof TelegramError) {
-                    if(e.response.description === 'Bad Request: message is too long') {
-                        let messagesArray = message.split(`
-                        
-                        `)
-                        let firstHalfMessagesArray = messagesArray.splice(0,messagesArray.length/2)
-                        let firstMessage = firstHalfMessagesArray.join(`
-                        
-                        `)
-                        let secondMessage = messagesArray.join(`
-                        
-                        `)
-                        bot.telegram.sendMessage(405531728, firstMessage)
-                        bot.telegram.sendMessage(405531728, secondMessage)
-                    }
-                }
+process.on("uncaughtException", () =>{
+    boot()
+})
 
-            }
-            
-        } else {
-            bot.telegram.sendMessage(405531728, 'Not found')
-        }
-    }
-
-    const bootstrap = () => {
-
-        start(coins);
-        setInterval(() => {
-            start(coins)
-        }, 300000)
-    }
-
-    // bootstrap()
-    // trackCoinAlertVolumes()
-    setInterval(()=>{
-        let timeOfWriting = '15:00:00'
-        let timeNow = new Date().toLocaleTimeString()
-        console.log(timeNow)
-        if(timeNow === timeOfWriting) {
-            trackCoinAlertVolumes()
-        }
-    },1000)
-
-});
+process.on("unhandledRejection", () =>{
+    boot()
+})
