@@ -20,7 +20,7 @@ const VOLUME_CHANGE_PERCENT = 200
 export const AppDataSource = new DataSource({
     type: "postgres",
     host: "localhost",
-    port: 5432,
+    port: 4001,
     username: "postgres",
     password: "admin",
     database: "ccassist",
@@ -107,15 +107,17 @@ const boot = () => {
         bootstrapTrackBinanceVolumes()
         // trackCoinAlertVolumes()
 
+        process.on("uncaughtException", () =>{
+            bootstrapTrackBinanceVolumes()
+        })
+        
+        process.on("unhandledRejection", () =>{
+            bootstrapTrackBinanceVolumes()
+        })
     
     });
-    process.on("uncaughtException", () =>{
-        boot()
-    })
-    
-    process.on("unhandledRejection", () =>{
-        boot()
-    })
+
+
 }
 
 boot()
