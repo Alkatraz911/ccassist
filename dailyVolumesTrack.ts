@@ -53,7 +53,14 @@ export const trackCoinAlertVolumes = async () => {
     
 }
 
+setInterval(()=>{
+    let timeOfWriting = '15:00:00'
+    let timeNow = new Date().toLocaleTimeString()
 
+    if(timeNow === timeOfWriting) {
+        trackCoinAlertVolumes()
+    }
+},1000)
 
 
 

@@ -2,10 +2,10 @@ import { CoinAlertVolumes } from './src/models/CoinAlertVolumes.js';
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { SpotTradingTickets } from "./src/models/SpotTradingTickets.js";
-import * as Technicalindicators from "technicalindicators";
+
 import { trackVolumes } from "./src/binanceVolumeTracker/binanceVolumeTracker.js";
-import { binanceKlinesLoader } from "./src/binanceKlinesLoader/binanceKlinesLoader.js";
-import { Big, RSI } from "trading-signals";
+
+
 import { bot } from "./src/bot/bot.js";
 import { binanceSpotActiveTicketsLoader } from './src/binanceSpotActiveTicketsLoader/binanceSpotActiveTicketsLoader.js'
 import { trackCoinAlertVolumes } from './dailyVolumesTrack.js'
@@ -15,18 +15,12 @@ import { TelegramError } from 'telegraf';
 const PRICE_CHANGE_PERCENT = 2
 const VOLUME_CHANGE_PERCENT = 200
 
-type volumesMapReturn = {
-    volume: string;
-    percentOfPreviousCandle: string;
-    priceChange: string;
-    priceChangePercent: string;
-    dateTime: string
-}
+
 
 export const AppDataSource = new DataSource({
     type: "postgres",
     host: "localhost",
-    port: 5432,
+    port: 4001,
     username: "postgres",
     password: "admin",
     database: "ccassist",
@@ -35,119 +29,23 @@ export const AppDataSource = new DataSource({
     logging: false,
 });
 
-function calculatRSI(closingPrices: any) {
-    // Calculate the average of the upward price changes
-    let avgUpwardChange = 0;
-    for (let i = 1; i < closingPrices.length; i++) {
-        avgUpwardChange += Math.max(0, closingPrices[i] - closingPrices[i - 1]);
-    }
-    avgUpwardChange /= closingPrices.length;
 
-    // Calculate the average of the downward price changes
-    let avgDownwardChange = 0;
-    for (let i = 1; i < closingPrices.length; i++) {
-        avgDownwardChange += Math.max(0, closingPrices[i - 1] - closingPrices[i]);
-    }
-    avgDownwardChange /= closingPrices.length;
-
-    // Calculate the RSI
-    const rsi = 100 - 100 / (1 + avgUpwardChange / avgDownwardChange);
-
-    return rsi;
-}
 
 const boot = () => {
     AppDataSource.initialize().then(async () => {
-        let coins = await AppDataSource.manager.find(SpotTradingTickets);
-        
-    
-        if (coins.length === 0) {
-            binanceSpotActiveTicketsLoader(AppDataSource)
-            coins = await AppDataSource.manager.find(SpotTradingTickets);
-        }
-    
-        const RSIcounter = async (
-            coins: SpotTradingTickets[],
-            firstTimefrfame: string,
-            secondTimeframe: string,
-            rsiLength: number
-        ) => {
-            type TicketWithRSI = {
-                ticker: string;
-                hourRsi: number;
-                halfdayRsi: number;
-            };
-    
-            let result: TicketWithRSI[] = [];
-    
-            let rsi = Technicalindicators.RSI;
-            if (coins) {
-                for (const el of coins) {
-                    let hoursArray = await binanceKlinesLoader(
-                        el.symbol,
-                        firstTimefrfame,
-                        rsiLength + 1
-                    );
-                    // let hourRsi = Math.round((calculatRSI(hoursArray.map(el => Number(el.closePrice))) + Number.EPSILON) * 100) / 100
-                    let [hourRsi] = rsi.calculate({
-                        period: rsiLength,
-                        values: hoursArray.map((el) => Number(el.closePrice)),
-                    });
-    
-                    let halfdayArray = await binanceKlinesLoader(
-                        el.symbol,
-                        secondTimeframe,
-                        rsiLength + 1
-                    );
-                    let halfdayRsi =
-                        Math.round(
-                            (calculatRSI(halfdayArray.map((el) => Number(el.closePrice))) +
-                                Number.EPSILON) *
-                            100
-                        ) / 100;
-                    if (hourRsi && halfdayRsi) {
-                        console.log({ ticker: el.symbol, hourRsi, halfdayRsi });
-                        result.push({ ticker: el.symbol, hourRsi, halfdayRsi });
-                    }
-                }
-                return result;
-            }
-        };
-    
+
         // bot.launch();
-    
-        const deepCorrectionAtUptrendFinder = (
-            coins: SpotTradingTickets[],
-            firstTimefrfame: string,
-            secondTimeframe: string,
-            rsiLength: number,
-            rsiValueshouldbelower: number,
-            rsiValueshouldbehigher: number
-        ) => {
-            RSIcounter(coins, firstTimefrfame, secondTimeframe, rsiLength).then(
-                (data) => {
-                    if (data) {
-                        let message = "📉Deep correction detected\n";
-                        for (const el of data) {
-                            if (
-                                el.hourRsi < rsiValueshouldbelower &&
-                                rsiValueshouldbehigher > 49
-                            ) {
-                                message += `Ticker: ${el.ticker} RSI1H: ${el.hourRsi} RSI12H: ${el.halfdayRsi}\n`;
-                            }
-                        }
-                        // bot.telegram.sendMessage(405531728, message)
-                    }
-                }
-            );
-        };
-    
-    
-    
         // deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)
         // setInterval(()=>{deepCorrectionAtUptrendFinder(coins, '1h', '12h', 14, 30, 50)}, 300000)
     
-        const start = async (coins: SpotTradingTickets[]) => {
+        const trackBinanceVolumes = async () => {
+            let coins = await AppDataSource.manager.find(SpotTradingTickets);
+            let chatId = 405531728;
+    
+            if (coins.length === 0) {
+                binanceSpotActiveTicketsLoader(AppDataSource)
+                coins = await AppDataSource.manager.find(SpotTradingTickets);
+            }
             let message = '';
             for (const el of coins) {
                 let result = await trackVolumes(el.symbol, "5m", 3)
@@ -173,7 +71,7 @@ const boot = () => {
             }
             if (message) {
                 try{
-                    bot.telegram.sendMessage(405531728, message)
+                    bot.telegram.sendMessage(chatId, message)
                 } catch(e) {
                     if(e instanceof TelegramError) {
                         if(e.response.description === 'Bad Request: message is too long') {
@@ -187,46 +85,42 @@ const boot = () => {
                             let secondMessage = messagesArray.join(`
                             
                             `)
-                            bot.telegram.sendMessage(405531728, firstMessage)
-                            bot.telegram.sendMessage(405531728, secondMessage)
+                            bot.telegram.sendMessage(chatId, firstMessage)
+                            bot.telegram.sendMessage(chatId, secondMessage)
                         }
                     }
     
                 }
                 
             } else {
-                bot.telegram.sendMessage(405531728, 'Not found')
+                bot.telegram.sendMessage(chatId, 'Not found')
             }
         }
     
-        const bootstrap = () => {
+        const bootstrapTrackBinanceVolumes = () => {
     
-            start(coins);
+            trackBinanceVolumes();
             setInterval(() => {
-                start(coins)
+                trackBinanceVolumes()
             }, 300000)
         }
-    
-        bootstrap()
+        bootstrapTrackBinanceVolumes()
         // trackCoinAlertVolumes()
-        setInterval(()=>{
-            let timeOfWriting = '15:00:00'
-            let timeNow = new Date().toLocaleTimeString()
-    
-            if(timeNow === timeOfWriting) {
-                trackCoinAlertVolumes()
-            }
-        },1000)
+
+        process.on("uncaughtException", () =>{
+            bootstrapTrackBinanceVolumes()
+        })
+        
+        process.on("unhandledRejection", () =>{
+            bootstrapTrackBinanceVolumes()
+        })
     
     });
+
+
 }
 
 boot()
 
-process.on("uncaughtException", () =>{
-    boot()
-})
 
-process.on("unhandledRejection", () =>{
-    boot()
-})
+
