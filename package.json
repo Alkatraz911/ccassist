@@ -5,8 +5,8 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "ts-node-esm index.ts",
-    "cat":  "ts-node-esm dailyVolumesTrack.ts",
+    "dev": "node --loader ts-node/esm index.ts",
+    "cat":  "node --loader ts-node/esm dailyVolumesTrack.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
