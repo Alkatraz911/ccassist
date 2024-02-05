@@ -48,12 +48,12 @@ const boot = () => {
             }
             let message = '';
             for (const el of coins) {
-                let result = await trackVolumes(el.symbol, "5m", 3)
+                let result = await trackVolumes(el.symbol, "1m", 3)
                 let { volumes, ticket, timeframe } = result
                 for (const el of volumes) {
                     let { volume, percentOfPreviousCandle, priceChange, priceChangePercent, dateTime } = el;
                     if (Number(priceChangePercent.slice(0, priceChangePercent.length - 1)) >= PRICE_CHANGE_PERCENT
-                        &&
+                        ||
                         Number(percentOfPreviousCandle.slice(0, percentOfPreviousCandle.length - 1)) >= VOLUME_CHANGE_PERCENT) {
                         message += `PUMP
                         ticket: ${ticket},
@@ -102,7 +102,7 @@ const boot = () => {
             trackBinanceVolumes();
             setInterval(() => {
                 trackBinanceVolumes()
-            }, 300000)
+            }, 60000)
         }
         bootstrapTrackBinanceVolumes()
         // trackCoinAlertVolumes()
